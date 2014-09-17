@@ -71,7 +71,7 @@ def make_delayed(stim, delays, circpad=False):
     nt,ndim = stim.shape
     dstims = []
     for di,d in enumerate(delays):
-        dstim = np.zeros((nt, ndi))
+        dstim = np.zeros((nt, ndim))
         if d<0: ## negative delay
             dstim[:d,:] = stim[-d:,:]
             if circpad:
