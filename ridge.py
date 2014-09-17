@@ -7,9 +7,10 @@ import itertools as itools
 
 zs = lambda v: (v-v.mean(0))/v.std(0) ## z-score function
 
+ridge_logger = logging.getLogger("ridge_corr")
 
 def ridge_corr(Rstim, Pstim, Rresp, Presp, alphas, normalpha=False, dtype=np.single, corrmin=0.2,
-               singcutoff=1e-10, use_corr=True, logger=logging.getLogger("ridge_corr")):
+               singcutoff=1e-10, use_corr=True, logger=ridge_logger):
     """Uses ridge regression to find a linear transformation of [Rstim] that approximates [Rresp].
     Then tests by comparing the transformation of [Pstim] to [Presp]. This procedure is repeated
     for each regularization parameter alpha in [alphas]. The correlation between each prediction and
@@ -59,11 +60,11 @@ def ridge_corr(Rstim, Pstim, Rresp, Presp, alphas, normalpha=False, dtype=np.sin
     
     """
     ## Calculate SVD of stimulus matrix
-    print "Doing SVD..."
+    logger.info("Doing SVD...")
     try:
         U,S,Vh = np.linalg.svd(Rstim, full_matrices=False)
     except np.linalg.LinAlgError, e:
-        print "NORMAL SVD FAILED, trying more robust dgesvd.."
+        logger.info("NORMAL SVD FAILED, trying more robust dgesvd..")
         from text.regression.svd_dgesvd import svd_dgesvd
         U,S,Vh = svd_dgesvd(Rstim, full_matrices=False)
 
@@ -74,13 +75,13 @@ def ridge_corr(Rstim, Pstim, Rresp, Presp, alphas, normalpha=False, dtype=np.sin
     U = U[:,:ngoodS]
     S = S[:ngoodS]
     Vh = Vh[:ngoodS]
-    print "Dropped %d tiny singular values.. (U is now %s)"%(nbad, str(U.shape))
+    logger.info("Dropped %d tiny singular values.. (U is now %s)"%(nbad, str(U.shape)))
 
     ## Normalize alpha by the Frobenius norm
     #frob = np.sqrt((S**2).sum()) ## Frobenius!
     frob = S[0]
     #frob = S.sum()
-    print "Training stimulus has Frobenius norm: %0.03f"%frob
+    logger.info("Training stimulus has Frobenius norm: %0.03f"%frob)
     if normalpha:
         nalphas = alphas * frob
     else:
@@ -127,17 +128,14 @@ def ridge_corr(Rstim, Pstim, Rresp, Presp, alphas, normalpha=False, dtype=np.sin
                                   np.max(Rcorr),
                                   corrmin,
                                   (Rcorr>corrmin).sum()-(-Rcorr>corrmin).sum())
-        if logger is not None:
-            logger.info(log_msg)
-        else:
-            print log_msg
+        logger.info(log_msg)
     
     return Rcorrs
 
 
 def bootstrap_ridge(Rstim, Rresp, Pstim, Presp, alphas, nboots, chunklen, nchunks, dtype=np.single,
                     corrmin=0.2, joined=None, singcutoff=1e-10, normalpha=False, single_alpha=False,
-                    use_corr=True):
+                    use_corr=True, logger=ridge_logger):
     """Uses ridge regression with a bootstrapped held-out set to get optimal alpha values for each response.
     [nchunks] random chunks of length [chunklen] will be taken from [Rstim] and [Rresp] for each regression
     run.  [nboots] total regression runs will be performed.  The best alpha value for each response will be
@@ -223,7 +221,7 @@ def bootstrap_ridge(Rstim, Rresp, Pstim, Presp, alphas, nboots, chunklen, nchunk
     
     Rcmats = []
     for bi in counter(range(nboots), countevery=1, total=nboots):
-        print "Selecting held-out test set.."
+        logger.info("Selecting held-out test set..")
         allinds = range(nresp)
         indchunks = zip(*[iter(allinds)]*chunklen)
         random.shuffle(indchunks)
@@ -239,7 +237,8 @@ def bootstrap_ridge(Rstim, Rresp, Pstim, Presp, alphas, nboots, chunklen, nchunk
         ## Run ridge regression using this test set
         Rcmat = ridge_corr(RRstim, PRstim, RRresp, PRresp, alphas,
                            dtype=dtype, corrmin=corrmin, singcutoff=singcutoff,
-                           normalpha=normalpha, use_corr=use_corr)
+                           normalpha=normalpha, use_corr=use_corr,
+                           logger=logger)
         
         Rcmats.append(Rcmat)
     
@@ -247,7 +246,7 @@ def bootstrap_ridge(Rstim, Rresp, Pstim, Presp, alphas, nboots, chunklen, nchunk
     try:
         U,S,Vh = np.linalg.svd(Rstim, full_matrices=False)
     except np.linalg.LinAlgError, e:
-        print "NORMAL SVD FAILED, trying more robust dgesvd.."
+        logger.info("NORMAL SVD FAILED, trying more robust dgesvd..")
         from text.regression.svd_dgesvd import svd_dgesvd
         U,S,Vh = svd_dgesvd(Rstim, full_matrices=False)
 
@@ -255,15 +254,21 @@ def bootstrap_ridge(Rstim, Rresp, Pstim, Presp, alphas, nboots, chunklen, nchunk
     #frob = np.sqrt((S**2).sum()) ## Frobenius!
     frob = S[0]
     #frob = S.sum()
-    print "Total training stimulus has Frobenius norm: %0.03f"%frob
+    logger.info("Total training stimulus has Frobenius norm: %0.03f"%frob)
     if normalpha:
         nalphas = alphas * frob
     else:
         nalphas = alphas
 
-    allRcorrs = np.dstack(Rcmats)
+    if nboots>0:
+        allRcorrs = np.dstack(Rcmats)
+    else:
+        allRcorrs = None
+    
     if not single_alpha:
-        print "Finding best alpha for each voxel.."
+        if nboots==0:
+            raise ValueError("You must run at least one cross-validation step to assign different alphas to each response.")
+        logger.info("Finding best alpha for each voxel..")
         if joined is None:
             ## Find best alpha for each voxel
             meanbootcorrs = allRcorrs.mean(2)
@@ -273,18 +278,27 @@ def bootstrap_ridge(Rstim, Rresp, Pstim, Presp, alphas, nboots, chunklen, nchunk
             ## Find best alpha for each group of voxels
             valphas = np.zeros((nvox,))
             for jl in joined:
-                jcorrs = allRcorrs[:,jl,:].mean(1).mean(1) ## Mean across voxels in the set, then mean across bootstraps
+                ## Mean across voxels in the set, then mean across bootstraps
+                jcorrs = allRcorrs[:,jl,:].mean(1).mean(1)
                 bestalpha = np.argmax(jcorrs)
                 valphas[jl] = nalphas[bestalpha]
     else:
-        print "Finding single best alpha.."
-        meanbootcorr = allRcorrs.mean(2).mean(1)
-        bestalphaind = np.argmax(meanbootcorr)
-        bestalpha = alphas[bestalphaind]
+        logger.info("Finding single best alpha..")
+        if nboots==0:
+            if len(alphas)==1:
+                bestalphaind = 0
+                bestalpha = alphas[0]
+            else:
+                raise ValueError("You must run at least one cross-validation step to choose best overall alpha.")
+        else:
+            meanbootcorr = allRcorrs.mean(2).mean(1)
+            bestalphaind = np.argmax(meanbootcorr)
+            bestalpha = alphas[bestalphaind]
+        
         valphas = np.array([bestalpha]*nvox)
-        print "Best alpha = %0.3f"%bestalpha
+        logger.info("Best alpha = %0.3f"%bestalpha)
 
-    print "Computing weights for each response using entire training set.."
+    logger.info("Computing weights for each response using entire training set..")
     UR = np.dot(U.T, np.nan_to_num(Rresp))
     pred = np.zeros(Presp.shape)
     wt = np.zeros((Rstim.shape[1], Rresp.shape[1]))
