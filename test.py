@@ -25,7 +25,7 @@ Pstim = features[TR:]
 # Run bootstrap ridge
 wt, corr, valphas, bscorrs, valinds = bootstrap_ridge(Rstim, Rresp, Pstim, Presp,
                                                       alphas=np.logspace(-2, 2, 20),
-                                                      nboots=100,
+                                                      nboots=5,
                                                       chunklen=10, nchunks=15)
 
 
