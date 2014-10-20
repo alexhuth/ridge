@@ -9,7 +9,7 @@ zs = lambda v: (v-v.mean(0))/v.std(0) ## z-score function
 
 ridge_logger = logging.getLogger("ridge_corr")
 
-def ridge_corr(Rstim, Pstim, Rresp, Presp, alphas, normalpha=False, dtype=np.single, corrmin=0.2,
+def ridge_corr(Rstim, Pstim, Rresp, Presp, alphas, normalpha=False, corrmin=0.2,
                singcutoff=1e-10, use_corr=True, logger=ridge_logger):
     """Uses ridge regression to find a linear transformation of [Rstim] that approximates [Rresp].
     Then tests by comparing the transformation of [Pstim] to [Presp]. This procedure is repeated
@@ -32,9 +32,6 @@ def ridge_corr(Rstim, Pstim, Rresp, Presp, alphas, normalpha=False, dtype=np.sin
     normalpha : boolean
         Whether ridge parameters should be normalized by the Frobenius norm of Rstim. Good for
         comparing models with different numbers of parameters.
-    dtype : np.dtype
-        All data will be cast as this dtype for computation. np.single is used by default for memory
-        efficiency.
     corrmin : float in [0..1]
         Purely for display purposes. After each alpha is tested, the number of responses with correlation
         greater than corrmin minus the number of responses with correlation less than negative corrmin
@@ -133,7 +130,7 @@ def ridge_corr(Rstim, Pstim, Rresp, Presp, alphas, normalpha=False, dtype=np.sin
     return Rcorrs
 
 
-def bootstrap_ridge(Rstim, Rresp, Pstim, Presp, alphas, nboots, chunklen, nchunks, dtype=np.single,
+def bootstrap_ridge(Rstim, Rresp, Pstim, Presp, alphas, nboots, chunklen, nchunks,
                     corrmin=0.2, joined=None, singcutoff=1e-10, normalpha=False, single_alpha=False,
                     use_corr=True, logger=ridge_logger):
     """Uses ridge regression with a bootstrapped held-out set to get optimal alpha values for each response.
@@ -167,10 +164,6 @@ def bootstrap_ridge(Rstim, Rresp, Pstim, Presp, alphas, nboots, chunklen, nchunk
         The number of training chunks held out to test ridge parameters for each bootstrap sample. The product
         of nchunks and chunklen is the total number of training samples held out for each sample, and this 
         product should be about 20 percent of the total length of the training data.
-    dtype : np.dtype
-        All data will be cast as this dtype for computation. np.single is used by default for memory efficiency,
-        as using np.double will thrash most machines on a big problem. If you want to do regression on 
-        complex variables, this should be changed to np.complex128.
     corrmin : float in [0..1]
         Purely for display purposes. After each alpha is tested for each bootstrap sample, the number of 
         responses with correlation greater than this value will be printed. For long-running regressions this
@@ -236,7 +229,7 @@ def bootstrap_ridge(Rstim, Rresp, Pstim, Presp, alphas, nboots, chunklen, nchunk
         
         ## Run ridge regression using this test set
         Rcmat = ridge_corr(RRstim, PRstim, RRresp, PRresp, alphas,
-                           dtype=dtype, corrmin=corrmin, singcutoff=singcutoff,
+                           corrmin=corrmin, singcutoff=singcutoff,
                            normalpha=normalpha, use_corr=use_corr,
                            logger=logger)
         
