@@ -2,7 +2,7 @@ ridge
 =====
 This is an implementation of [ridge regression](http://en.wikipedia.org/wiki/Tikhonov_regularization) (aka L2-regularized regression or Tikhonov regression) that takes advantage of some linear algebra tricks to do very efficient cross validation. This method is particularly useful when the number of models that you are trying to fit simultaneously is very large (thousands to tens of thousands), the number of features is very large (thousands), and the number of data points for each model is very large (thousands). 
 
-Even for a pretty modest ridge regression problem (20k models, 2k features, 1k data points), this method 9x less time to fit (80 seconds vs. 718 seconds) versus scikit-learn's cross validated ridge regression (not [GCV](http://en.wikipedia.org/wiki/Tikhonov_regularization#Determination_of_the_Tikhonov_factor)).
+Even for a pretty modest ridge regression problem (20k models, 2k features, 1k data points), this method takes 9x less time to fit (80 seconds vs. 718 seconds) versus scikit-learn's cross validated ridge regression (not [GCV](http://en.wikipedia.org/wiki/Tikhonov_regularization#Determination_of_the_Tikhonov_factor)).
 
 This code was developed mainly for building voxel-wise models of fMRI data, where we often want to fit tens of thousands of models simultaneously (1 for each voxel) with thousands of features and thousands of data points.
 
