@@ -55,7 +55,7 @@ def ridge(stim, resp, alpha, singcutoff=1e-10, normalpha=False):
     ualphas = np.unique(nalphas)
     wt = np.zeros((stim.shape[1], resp.shape[1]))
     for ua in ualphas:
-        selvox = np.nonzero(alpha==ua)[0]
+        selvox = np.nonzero(nalphas==ua)[0]
         awt = reduce(np.dot, [Vh.T, np.diag(S/(S**2+ua**2)), UR[:,selvox]])
         wt[:,selvox] = awt
 
@@ -295,7 +295,9 @@ def bootstrap_ridge(Rstim, Rresp, Pstim, Presp, alphas, nboots, chunklen, nchunk
     
     if not single_alpha:
         if nboots==0:
-            raise ValueError("You must run at least one cross-validation step to assign different alphas to each response.")
+            raise ValueError("You must run at least one cross-validation step to assign "
+                             "different alphas to each response.")
+        
         logger.info("Finding best alpha for each voxel..")
         if joined is None:
             # Find best alpha for each voxel
@@ -317,7 +319,9 @@ def bootstrap_ridge(Rstim, Rresp, Pstim, Presp, alphas, nboots, chunklen, nchunk
                 bestalphaind = 0
                 bestalpha = alphas[0]
             else:
-                raise ValueError("You must run at least one cross-validation step to choose best overall alpha.")
+                raise ValueError("You must run at least one cross-validation step "
+                                 "to choose best overall alpha, or only supply one"
+                                 "possible alpha value.")
         else:
             meanbootcorr = allRcorrs.mean(2).mean(1)
             bestalphaind = np.argmax(meanbootcorr)
@@ -336,6 +340,7 @@ def bootstrap_ridge(Rstim, Rresp, Pstim, Presp, alphas, nboots, chunklen, nchunk
 
     # Find prediction correlations
     nnpred = np.nan_to_num(pred)
-    corrs = np.nan_to_num(np.array([np.corrcoef(Presp[:,ii], nnpred[:,ii].ravel())[0,1] for ii in range(Presp.shape[1])]))
+    corrs = np.nan_to_num(np.array([np.corrcoef(Presp[:,ii], nnpred[:,ii].ravel())[0,1]
+                                    for ii in range(Presp.shape[1])]))
 
     return wt, corrs, valphas, allRcorrs, valinds
