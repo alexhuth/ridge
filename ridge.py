@@ -9,7 +9,7 @@ zs = lambda v: (v-v.mean(0))/v.std(0) ## z-score function
 
 ridge_logger = logging.getLogger("ridge_corr")
 
-def ridge(stim, resp, alpha, singcutoff=1e-10, normalpha=False):
+def ridge(stim, resp, alpha, singcutoff=1e-10, normalpha=False, logger=ridge_logger):
     """Uses ridge regression to find a linear transformation of [stim] that approximates
     [resp]. The regularization parameter is [alpha].
 
@@ -33,7 +33,7 @@ def ridge(stim, resp, alpha, singcutoff=1e-10, normalpha=False):
     """
     try:
         U,S,Vh = np.linalg.svd(stim, full_matrices=False)
-    except np.linalg.LinAlgError, e:
+    except np.linalg.LinAlgError:
         logger.info("NORMAL SVD FAILED, trying more robust dgesvd..")
         from text.regression.svd_dgesvd import svd_dgesvd
         U,S,Vh = svd_dgesvd(stim, full_matrices=False)
@@ -114,14 +114,14 @@ def ridge_corr(Rstim, Pstim, Rresp, Presp, alphas, normalpha=False, corrmin=0.2,
     logger.info("Doing SVD...")
     try:
         U,S,Vh = np.linalg.svd(Rstim, full_matrices=False)
-    except np.linalg.LinAlgError, e:
+    except np.linalg.LinAlgError:
         logger.info("NORMAL SVD FAILED, trying more robust dgesvd..")
         from text.regression.svd_dgesvd import svd_dgesvd
         U,S,Vh = svd_dgesvd(Rstim, full_matrices=False)
 
     ## Truncate tiny singular values for speed
     origsize = S.shape[0]
-    ngoodS = np.sum(S>singcutoff)
+    ngoodS = np.sum(S > singcutoff)
     nbad = origsize-ngoodS
     U = U[:,:ngoodS]
     S = S[:ngoodS]
@@ -142,11 +142,14 @@ def ridge_corr(Rstim, Pstim, Rresp, Presp, alphas, normalpha=False, corrmin=0.2,
     
     #Prespnorms = np.apply_along_axis(np.linalg.norm, 0, Presp) ## Precompute test response norms
     zPresp = zs(Presp)
-    Prespvar = Presp.var(0)
+    #Prespvar = Presp.var(0)
+    Prespvar_actual = Presp.var(0)
+    Prespvar = (np.ones_like(Prespvar_actual) + Prespvar_actual) / 2.0
+    logger.info("Average difference between actual & assumed Prespvar: %0.3f" % (Prespvar_actual - Prespvar).mean())
     Rcorrs = [] ## Holds training correlations for each alpha
     for na, a in zip(nalphas, alphas):
         #D = np.diag(S/(S**2+a**2)) ## Reweight singular vectors by the ridge parameter 
-        D = S/(S**2+na**2) ## Reweight singular vectors by the (normalized?) ridge parameter
+        D = S / (S ** 2 + na ** 2) ## Reweight singular vectors by the (normalized?) ridge parameter
         
         pred = np.dot(mult_diag(D, PVh, left=False), UR) ## Best (1.75 seconds to prediction in test)
         # pred = np.dot(mult_diag(D, np.dot(Pstim, Vh.T), left=False), UR) ## Better (2.0 seconds to prediction in test)
@@ -162,11 +165,12 @@ def ridge_corr(Rstim, Pstim, Rresp, Presp, alphas, normalpha=False, corrmin=0.2,
             #prednorms = np.apply_along_axis(np.linalg.norm, 0, pred) ## Compute predicted test response norms
             #Rcorr = np.array([np.corrcoef(Presp[:,ii], pred[:,ii].ravel())[0,1] for ii in range(Presp.shape[1])]) ## Slowly compute correlations
             #Rcorr = np.array(np.sum(np.multiply(Presp, pred), 0)).squeeze()/(prednorms*Prespnorms) ## Efficiently compute correlations
-            Rcorr = (zPresp*zs(pred)).mean(0)
+            Rcorr = (zPresp * zs(pred)).mean(0)
         else:
             ## Compute variance explained
-            resvar = (Presp-pred).var(0)
-            Rcorr = np.clip(1-(resvar/Prespvar), 0, 1)
+            resvar = (Presp - pred).var(0)
+            Rsq = 1 - (resvar / Prespvar)
+            Rcorr = np.sqrt(np.abs(Rsq)) * np.sign(Rsq)
             
         Rcorr[np.isnan(Rcorr)] = 0
         Rcorrs.append(Rcorr)
@@ -261,7 +265,6 @@ def bootstrap_ridge(Rstim, Rresp, Pstim, Presp, alphas, nboots, chunklen, nchunk
         The indices of the training data that were used as "validation" for each bootstrap sample.
     """
     nresp, nvox = Rresp.shape
-    bestalphas = np.zeros((nboots, nvox))  # Will hold the best alphas for each voxel
     valinds = [] # Will hold the indices into the validation data for each bootstrap
     
     Rcmats = []
@@ -340,7 +343,12 @@ def bootstrap_ridge(Rstim, Rresp, Pstim, Presp, alphas, nboots, chunklen, nchunk
 
     # Find prediction correlations
     nnpred = np.nan_to_num(pred)
-    corrs = np.nan_to_num(np.array([np.corrcoef(Presp[:,ii], nnpred[:,ii].ravel())[0,1]
-                                    for ii in range(Presp.shape[1])]))
+    if use_corr:
+        corrs = np.nan_to_num(np.array([np.corrcoef(Presp[:,ii], nnpred[:,ii].ravel())[0,1]
+                                        for ii in range(Presp.shape[1])]))
+    else:
+        resvar = (Presp-pred).var(0)
+        Rsqs = 1 - (resvar / Presp.var(0))
+        corrs = np.sqrt(np.abs(Rsqs)) * np.sign(Rsqs)
 
     return wt, corrs, valphas, allRcorrs, valinds
