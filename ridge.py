@@ -1,7 +1,7 @@
 #import scipy
 import numpy as np
 import logging
-from utils import mult_diag, counter
+from .utils import mult_diag, counter
 import random
 import itertools as itools
 
@@ -56,7 +56,8 @@ def ridge(stim, resp, alpha, singcutoff=1e-10, normalpha=False, logger=ridge_log
     wt = np.zeros((stim.shape[1], resp.shape[1]))
     for ua in ualphas:
         selvox = np.nonzero(nalphas==ua)[0]
-        awt = reduce(np.dot, [Vh.T, np.diag(S/(S**2+ua**2)), UR[:,selvox]])
+        #awt = reduce(np.dot, [Vh.T, np.diag(S/(S**2+ua**2)), UR[:,selvox]])
+        awt = Vh.T.dot(np.diag(S/(S**2+ua**2))).dot(UR[:,selvox])
         wt[:,selvox] = awt
 
     return wt
@@ -271,7 +272,7 @@ def bootstrap_ridge(Rstim, Rresp, Pstim, Presp, alphas, nboots, chunklen, nchunk
     for bi in counter(range(nboots), countevery=1, total=nboots):
         logger.info("Selecting held-out test set..")
         allinds = range(nresp)
-        indchunks = zip(*[iter(allinds)]*chunklen)
+        indchunks = list(zip(*[iter(allinds)]*chunklen))
         random.shuffle(indchunks)
         heldinds = list(itools.chain(*indchunks[:nchunks]))
         notheldinds = list(set(allinds)-set(heldinds))

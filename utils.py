@@ -141,6 +141,6 @@ def counter(iterable, countevery=100, total=None, logger=logging.getLogger("coun
 
             formatted_str = "%s items complete (%s%s)"%(itemstr,ratestr,timestr)
             if logger is None:
-                print formatted_str
+                print(formatted_str)
             else:
                 logger.info(formatted_str)
