@@ -41,7 +41,7 @@ def ridge(stim, resp, alpha, singcutoff=1e-10, normalpha=False, logger=ridge_log
     UR = np.dot(U.T, np.nan_to_num(resp))
     
     # Expand alpha to a collection if it's just a single value
-    if isinstance(alpha, float):
+    if isinstance(alpha, (float,int)):
         alpha = np.ones(resp.shape[1]) * alpha
     
     # Normalize alpha by the LSV norm
