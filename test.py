@@ -26,7 +26,7 @@ Pstim = features[TR:]
 wt, corr, valphas, bscorrs, valinds = bootstrap_ridge(Rstim, Rresp, Pstim, Presp,
                                                       alphas=np.logspace(-2, 2, 20),
                                                       nboots=5,
-                                                      chunklen=10, nchunks=15)
+                                                      chunklen=10, nchunks=15, return_wt=False)
 
 
 # Corr should increase quickly across "voxels". Last corr should be large (>0.9-ish).
