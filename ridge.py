@@ -321,38 +321,43 @@ def bootstrap_ridge(Rstim, Rresp, Pstim, Presp, alphas, nboots, chunklen, nchunk
         The number of training chunks held out to test ridge parameters for each bootstrap sample. The product
         of nchunks and chunklen is the total number of training samples held out for each sample, and this 
         product should be about 20 percent of the total length of the training data.
-    corrmin : float in [0..1]
+    corrmin : float in [0..1], default 0.2
         Purely for display purposes. After each alpha is tested for each bootstrap sample, the number of 
         responses with correlation greater than this value will be printed. For long-running regressions this
         can give a rough sense of how well the model works before it's done.
-    joined : None or list of array_like indices
+    joined : None or list of array_like indices, default None
         If you want the STRFs for two (or more) responses to be directly comparable, you need to ensure that
         the regularization parameter that they use is the same. To do that, supply a list of the response sets
         that should use the same ridge parameter here. For example, if you have four responses, joined could
         be [np.array([0,1]), np.array([2,3])], in which case responses 0 and 1 will use the same ridge parameter
         (which will be parameter that is best on average for those two), and likewise for responses 2 and 3.
-    singcutoff : float
+    singcutoff : float, default 1e-10
         The first step in ridge regression is computing the singular value decomposition (SVD) of the
         stimulus Rstim. If Rstim is not full rank, some singular values will be approximately equal
         to zero and the corresponding singular vectors will be noise. These singular values/vectors
         should be removed both for speed (the fewer multiplications the better!) and accuracy. Any
         singular values less than singcutoff will be removed.
-    normalpha : boolean
+    normalpha : boolean, default False
         Whether ridge parameters (alphas) should be normalized by the largest singular value (LSV)
         norm of Rstim. Good for rigorously comparing models with different numbers of parameters.
-    single_alpha : boolean
+    single_alpha : boolean, default False
         Whether to use a single alpha for all responses. Good for identification/decoding.
-    use_corr : boolean
+    use_corr : boolean, default True
         If True, this function will use correlation as its metric of model fit. If False, this function
         will instead use variance explained (R-squared) as its metric of model fit. For ridge regression
         this can make a big difference -- highly regularized solutions will have very small norms and
         will thus explain very little variance while still leading to high correlations, as correlation
         is scale-free while R**2 is not.
+    return_wt : boolean, default True
+        If True, this function will compute and return the regression weights after finding the best
+        alpha parameter for each voxel. However, for very large models this can lead to memory issues.
+        If false, this function will _not_ compute weights, but will still compute prediction performance
+        on the prediction dataset (Pstim, Presp).
     
     Returns
     -------
     wt : array_like, shape (N, M)
-        Regression weights for N features and M responses.
+        If [return_wt] is True, regression weights for N features and M responses. If [return_wt] is False, [].
     corrs : array_like, shape (M,)
         Validation set correlations. Predicted responses for the validation set are obtained using the regression
         weights: pred = np.dot(Pstim, wt), and then the correlation between each predicted response and each 
@@ -455,7 +460,7 @@ def bootstrap_ridge(Rstim, Rresp, Pstim, Presp, alphas, nboots, chunklen, nchunk
 
         return wt, corrs, valphas, allRcorrs, valinds
     else:
-        # get correlations for prediction set directly
+        # get correlations for prediction dataset directly
         corrs = ridge_corr_pred(Rstim, Pstim, Rresp, Presp, valphas, 
                                 normalpha=normalpha, use_corr=use_corr,
                                 logger=logger, singcutoff=singcutoff)
